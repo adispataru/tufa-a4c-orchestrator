@@ -1,0 +1,5 @@
+package alien4cloud.tufa.model;
+
+public enum ResourceType {
+    OPENSTACK_ACCOUNT, OPENSTACK_RESOURCE, OPENSTACK_VM, BAREMETAL, MARATHON, SLURM_RESOURCE_MANAGER, KUBERNETES;
+}

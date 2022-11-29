@@ -1,0 +1,13 @@
+id: a4c-tufa-provider
+name: TUFA Orchestrator plugin
+version: ${project.version}
+description: >
+  TUFA
+
+configuration_class: tufa.PluginContextConfiguration
+
+component_descriptors:
+  - bean_name: tufa-orchestrator-factory
+    name: TUFA provider
+    description: >
+      Provider that allows definition of TUFA managed deployment targets within A4C.

@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "grunt-contrib-compass": "^1.1.1"
+  }
+}

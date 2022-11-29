@@ -1,0 +1,171 @@
+<!-- Main view of the plugin ui -->
+<!--
+ * Copyright 2017 Institute e-Austria Timisoara.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ -->
+<div>
+    <div class="row" style="margin-top: 10px; margin-left: 75px">
+
+
+
+        <div class="tab-pane">
+
+            <div class="row" style="margin-top: 10px;">
+                <div class="col-md-8">
+
+                    <h4 style="display:inline; padding-left:5px; vertical-align:middle;">{{clPrintingStatus}}</h4>
+                    <i class="fa fa-2x vertical-center"  ng-class="{
+            'fa-circle text-success' : clTopologyStatus == 'OPTIMISED',
+            'fa-circle text-muted' : clTopologyStatus == 'NOT_STARTED',
+            'fa-spinner fa-spin' :clTopologyStatus == 'IN_PROGRESS',
+            'fa-circle text-danger': clTopologyStatus == 'ERROR'
+          }">
+                    </i>
+
+
+                </div>
+<!--                <div class="col-md-4">-->
+<!--                    <h4>SDE Endpoint</h4>-->
+<!--                    <div class="col-md-6">-->
+<!--                        <input class="form-control" type="text" name="sdeEndpoint" ng-model="sdeEndpoint" disabled/>-->
+<!--                    </div>-->
+<!--                    &lt;!&ndash; <div class="col-md-2">-->
+<!--                         <button class="btn btn-success" ng-click="setSdeEndpoint(sdeEndpoint)">Set</button>-->
+<!--                     </div> &ndash;&gt;-->
+
+<!--                </div>-->
+            </div>
+            <div class="row">
+                <div class="col-md-8 ">
+                    <h4>Resource discovery</h4>
+                    <table class="table table-hover">
+                        <tr>
+                            <td>
+                                <button id="btn-cloudlightning"
+                                        type="button"
+                                        class="btn btn-success " ng-disabled="clTopologyStatus != 'NOT_STARTED'"
+                                        ng-click="cloudlightningTopo()">
+
+                                    Discover <i class="fa fa-magic" ></i>
+                                </button>
+
+                            </td>
+                            <td>
+                                Start the resource discovery process. This will choose the most suitable configuration in relation to the current state of the system.
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td>
+                                <button id="btn-cloudlightning-release"
+
+                                        type="button"
+                                        class="btn btn-primary " ng-disabled="clTopologyStatus == 'NOT_STARTED'"
+                                        ng-click="cloudlightningTopoRelease()">
+
+                                    Release <i class="fa fa-paper-plane-o" ></i>
+                                </button>
+                            </td>
+                            <td>
+                                Release the resources acquired for running the services.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <button id="btn-cloudlightning-redirect"
+
+                                        type="button"
+                                        class="btn btn-default"
+                                        ng-click="cloudlightningTopoRedirect()">
+
+                                    Topology View <i class="fa fa-reply" ></i>
+                                </button>
+                            </td>
+                            <td> </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-4">
+                    <h5>Settings</h5>
+                    <table class="table table-hover">
+                        <tr>
+                            <td>Auto-deploy </td> <td> <fieldset ng-disabled="clTopologyStatus != 'NOT_STARTED'"> <switch id="enabled" name="enabled" ng-model="autodeploy" class="green" ></switch> </fieldset></td>
+                        </tr>
+                        <tr>
+                            <td>Performance</td>
+                            <td>
+                                <!-- <select ng-model="selectedPerformance" ng-options="x for x in performance"></select>  -->
+                                <ui-select ng-model="selectedPerformance.item" theme="bootstrap" ng-disabled="clTopologyStatus != 'NOT_STARTED'" title="Performance">
+                                    <ui-select-match placeholder="Performance...">{{selectedPerformance.item}}</ui-select-match>
+                                    <ui-select-choices repeat="x in performance | filter: $select.search">
+                                        <span ng-bind-html="x | highlight: $select.search"></span>
+                                    </ui-select-choices>
+                                </ui-select>
+                            </td>
+                        </tr>
+                        <!-- <tr>
+                            <td>Record </td> <td><switch id="enabled" name="enabled" ng-model="record" class="green" ng-disabled="clTopologyStatus != 'NOT_STARTED'"></switch></td>
+                        </tr>
+                        <tr>
+                            <td>Repeat </td> <td><input type="number" name="repeat" ng-model="repeat" ng-disabled="clTopologyStatus != 'NOT_STARTED'"></td>
+                        </tr> -->
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+
+
+    </div>
+
+    <hr class="separator-h">
+
+    <!-- <div class="col-md-3" ng-if="finishedChanges">
+        <accordion>
+
+            <accordion-group ng-repeat="oldNode in oldNodes" class="panel-success" heading="{{oldNode}}">
+                <p>Add attributes</p>
+
+            </accordion-group>
+        </accordion>
+    </div>
+
+    <div class="col-md-3" ng-if="finishedChanges">
+        <accordion>
+
+            <accordion-group ng-repeat="newNode in newNodes" class="panel-info" heading="{{newNode}}">
+                <p>Add attributes</p>
+
+            </accordion-group>
+        </accordion>
+    </div> -->
+
+
+    <div class="col-md-6" ng-if="finishedChanges" style="margin-top: 10px; margin-left: 75px">
+        <accordion>
+
+            <accordion-group heading="Results" class="panel-primary collapse in" >
+                <div ng-repeat="replace in replacements" >
+                    <h5> {{replace.msg}} </h5>
+                    <p>{{replace.action1}} <i class="fa " aria-hidden="true" ng-class="{'fa-arrow-right': replace.action2 != '', 'fa-check' : replace.action2 == ''}"></i> {{replace.action2}}</p>
+
+                </div>
+            </accordion-group>
+        </accordion>
+    </div>
+
+
+
+</div>

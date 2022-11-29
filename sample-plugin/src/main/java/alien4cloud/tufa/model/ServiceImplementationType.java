@@ -1,0 +1,5 @@
+package alien4cloud.tufa.model;
+
+public enum ServiceImplementationType {
+    CPU_VM, CPU_CONTAINER, CPU_BM, CPU_QUEUE, GPU_VM, GPU_CONTAINER, GPU_BM, GPU_QUEUE, DFE_VM, DFE_CONTAINER, DEF_BM, DFE_QUEUE, MIC_VM, MIC_CONTAINER, MIC_BM, MIC_QUEUE;
+}

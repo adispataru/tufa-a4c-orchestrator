@@ -1,0 +1,106 @@
+/*adding a wide width for larger switch text*/
+
+/*wider switch text moves small further to the right*/
+
+/*styles for switch-text*/
+
+/* line 4, ../../src/main/webapp/styles/plugin.scss */
+
+.switch {
+  background: #fff;
+  border: 1px solid #dfdfdf;
+  position: relative;
+  display: inline-block;
+  -moz-box-sizing: content-box;
+  box-sizing: content-box;
+  overflow: visible;
+  width: 52px;
+  height: 30px;
+  padding: 0px;
+  margin: 0px;
+  border-radius: 20px;
+  cursor: pointer;
+  box-shadow: #dfdfdf 0px 0px 0px 0px inset;
+  transition: 0.3s ease-out all;
+  top: -1px;
+}
+
+/* line 21, ../../src/main/webapp/styles/plugin.scss */
+
+.switch small {
+  background: #fff;
+  border-radius: 100%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  width: 30px;
+  height: 30px;
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  transition: 0.3s ease-out all;
+}
+
+/* line 33, ../../src/main/webapp/styles/plugin.scss */
+
+.switch .switch-text {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+}
+
+/* line 37, ../../src/main/webapp/styles/plugin.scss */
+
+.switch .off {
+  display: block;
+  position: absolute;
+  right: 10%;
+  top: 25%;
+  z-index: 0;
+  color: #A9A9A9;
+}
+
+/* line 45, ../../src/main/webapp/styles/plugin.scss */
+
+.switch .on {
+  display: none;
+  z-index: 0;
+  color: #fff;
+  position: absolute;
+  top: 25%;
+  left: 9%;
+}
+
+/* line 54, ../../src/main/webapp/styles/plugin.scss */
+
+.switch.wide {
+  width: 80px;
+}
+
+/* line 57, ../../src/main/webapp/styles/plugin.scss */
+
+.switch.checked {
+  background: #64bd63;
+  border-color: #64bd63;
+}
+
+/* line 60, ../../src/main/webapp/styles/plugin.scss */
+
+.switch.checked small {
+  left: 22px;
+}
+
+/* line 63, ../../src/main/webapp/styles/plugin.scss */
+
+.switch.checked .off {
+  display: none;
+}
+
+/* line 66, ../../src/main/webapp/styles/plugin.scss */
+
+.switch.checked .on {
+  display: block;
+}
+
+/* line 71, ../../src/main/webapp/styles/plugin.scss */
+
+.switch.wide.checked small {
+  left: 52px;
+}
