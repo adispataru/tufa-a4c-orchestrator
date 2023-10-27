@@ -1,5 +1,6 @@
 package tufa;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +22,8 @@ public class TUFALocationConfigurerFactory {
     private ApplicationContext applicationContext;
 
     public ILocationConfiguratorPlugin newInstance(String locationType) {
-        if (TUFAOrchestratorFactory.TYPE.equals(locationType)) {
+
+        if (Arrays.asList(TUFAOrchestratorFactory.TYPES).contains(locationType)) {
             return applicationContext. getBean(TUFALocationConfigurer.class);
         }
         return new ILocationConfiguratorPlugin() {

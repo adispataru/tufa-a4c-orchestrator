@@ -19,7 +19,7 @@ import alien4cloud.orchestrators.plugin.IOrchestratorPluginFactory;
 @Component("tufa-orchestrator-factory")
 public class TUFAOrchestratorFactory implements IOrchestratorPluginFactory<TUFAOrchestrator, Configuration> {
 
-    public static final String TYPE = "TUFA";
+    public static final String[] TYPES = {"SERRANO", "Kubernetes"};
 
     @Autowired
     private BeanFactory beanFactory;
@@ -35,7 +35,7 @@ public class TUFAOrchestratorFactory implements IOrchestratorPluginFactory<TUFAO
     @Override
     public TUFAOrchestrator newInstance(Configuration configuration) {
         TUFAOrchestrator instance = beanFactory.getBean(TUFAOrchestrator.class);
-        log.info("Init ASPIDE provider and beanFactory is {}", beanFactory);
+        log.info("Init TUFA provider and beanFactory is {}", beanFactory);
         return instance;
     }
 
@@ -57,12 +57,12 @@ public class TUFAOrchestratorFactory implements IOrchestratorPluginFactory<TUFAO
 //                ToscaMeta
 //                DefaultToscaTypeProvider.class.getName(),
 //                BrooklynToscaTypeProvider.class.getName());
-        return new Configuration("10.10.10.3", "aspide", "aspide", "/home/aspide/dce", "ASPIDE", metadataProviders);
+        return new Configuration("https://ai-so.serrano.eu", "83.212.102.89:1883", "https://on-premise-storage-gateway.services.cloud.ict-serrano.eu/s3", "serrano_user", "password", "Cloud", false, null, null, null, null, null);
     }
 
     @Override
     public LocationSupport getLocationSupport() {
-        return new LocationSupport(true, new String[] {TYPE});
+        return new LocationSupport(true, TYPES);
     }
 
     @Override

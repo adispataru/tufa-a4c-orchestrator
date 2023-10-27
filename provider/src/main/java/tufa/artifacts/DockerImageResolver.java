@@ -22,7 +22,7 @@ public class DockerImageResolver implements IArtifactResolver {
 
     @Override
     public ValidationResult canHandleArtifact(String artifactReference, String repositoryURL, String repositoryType, Map<String, Object> credentials) {
-        if(repositoryType.equals("http") && repositoryURL.contains("docker"))
+        if("private".equals(repositoryType))
             return ValidationResult.SUCCESS;
         return getResolverType().equals(repositoryType) ? ValidationResult.SUCCESS : new ValidationResult(ValidationStatus.INVALID_REPOSITORY_TYPE, "");
     }

@@ -1,5 +1,7 @@
 package tufa;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +11,10 @@ import javax.inject.Inject;
 import alien4cloud.model.runtime.Execution;
 import alien4cloud.paas.exception.PluginConfigurationException;
 import alien4cloud.paas.model.PaaSTopologyDeploymentContext;
+import io.fabric8.kubernetes.client.Config;
+import io.fabric8.kubernetes.client.ConfigBuilder;
+import io.fabric8.kubernetes.client.DefaultKubernetesClient;
+import io.fabric8.kubernetes.client.KubernetesClient;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
@@ -30,11 +36,11 @@ import lombok.extern.slf4j.Slf4j;
 public class TUFAOrchestrator extends TUFAProvider implements IOrchestratorPlugin<Configuration>, ILocationAutoConfigurer {
 
     @Inject
-    private TUFALocationConfigurerFactory aspideLocationConfigurerFactory;
+    private TUFALocationConfigurerFactory tufaLocationConfigurerFactory;
 
     @Override
     public ILocationConfiguratorPlugin getConfigurator(String locationType) {
-        return aspideLocationConfigurerFactory.newInstance(locationType);
+        return tufaLocationConfigurerFactory.newInstance(locationType);
     }
 
     @Override
@@ -48,9 +54,13 @@ public class TUFAOrchestrator extends TUFAProvider implements IOrchestratorPlugi
 //        List<LocationSummary> locations = getNewBrooklynApi().getLocationApi().list();
         List<Location> newLocations = Lists.newArrayList();
         Location l = new Location();
-        l.setName("Cluster");
-        l.setInfrastructureType("ASPIDE");
+        l.setName("SERRANO");
+        l.setInfrastructureType("SERRANO");
         newLocations.add(l);
+        Location l2 = new Location();
+        l2.setName("Kubernetes");
+        l2.setInfrastructureType("Kubernetes");
+        newLocations.add(l2);
         return newLocations;
     }
 
@@ -58,6 +68,7 @@ public class TUFAOrchestrator extends TUFAProvider implements IOrchestratorPlugi
     @Override
     public void setConfiguration(String s, Configuration configuration) throws PluginConfigurationException {
         super.configuration = configuration;
+        super.serranoMappingService.setConfiguration(super.configuration);
     }
 
 
@@ -67,6 +78,30 @@ public class TUFAOrchestrator extends TUFAProvider implements IOrchestratorPlugi
         useLocalContextClassLoader();
         try {
             log.info("INIT: " + activeDeployments);
+
+
+            if(configuration.getKube()) {
+                // Create a Kubernetes client configuration from the custom configuration file
+//                Config config = Config.fromKubeconfig(kubeConfig);
+                Config config = new ConfigBuilder().withCaCertData(configuration.getCacertData())
+                        .withMasterUrl(configuration.getKubeURL())
+                        .withUsername(configuration.getKubeUsername())
+                        .withOauthToken(configuration.getKubeToken())
+                        .withNamespace(configuration.getKubeNamespace()).build();
+
+                // Initialize the Kubernetes client
+                try {
+                    kubeClient = new DefaultKubernetesClient(config);
+                    // Now you can use the 'client' object to interact with your Kubernetes cluster
+                    // For example, you can list pods, create resources, etc.
+                    kubeClient.pods().list().getItems().forEach(pod -> {
+                        System.out.println("Pod Name: " + pod.getMetadata().getName());
+                    });
+                    log.info("Successfully connected to Kubernetes cluster");
+                } catch (Exception e) {
+                    log.info("Could not initialize Kubernetes client, with provided credentials");
+                }
+            }
 
 //            catalogMapper.addBaseTypes();
 

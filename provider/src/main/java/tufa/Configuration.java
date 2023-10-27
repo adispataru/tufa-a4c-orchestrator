@@ -2,14 +2,11 @@ package tufa;
 
 import javax.validation.constraints.NotNull;
 
+import alien4cloud.ui.form.annotation.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import alien4cloud.ui.form.annotation.FormLabel;
-import alien4cloud.ui.form.annotation.FormProperties;
-import alien4cloud.ui.form.annotation.FormPropertyConstraint;
-import alien4cloud.ui.form.annotation.FormPropertyDefinition;
 
 import java.util.List;
 
@@ -17,28 +14,55 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@FormProperties({ "url", "user", "password", "location", "dcePath", "providers" })
+@FormProperties({ "AIUrl", "dataBrokerUrl", "storageServiceUrl", "user", "password", "location", "kube", "kubeURL", "cacertData", "kubeUsername", "kubeToken", "kubeNamespace"})
 public class Configuration {
 
-    @FormLabel("ASPIDE Orchestrator URL")
+    @FormLabel("AI-Enhanced Service Orchestrator URL")
     @FormPropertyConstraint(pattern = "http\\:.+(?:\\d+)")
     @NotNull
-    private String url;
+    private String AIUrl;
 
-    @FormLabel("SLURM User")
+    @FormLabel("Serrano Data Broker URL")
+    @FormPropertyConstraint(pattern = "http\\:.+(?:\\d+)")
+    @NotNull
+    private String dataBrokerUrl;
+
+    @FormLabel("Serrano Storage Service URL")
+    @FormPropertyConstraint(pattern = "http\\:.+(?:\\d+)")
+    @NotNull
+    private String storageServiceUrl;
+
+    @FormLabel("Serrano SDK User")
     private String user;
 
-    @FormLabel("SLURM Password")
+    @FormLabel("Serrano SDK Password")
     @FormPropertyDefinition(type = "string", isPassword = true)
     private String password;
 
-    @FormLabel("DCEx Runtime Path")
-    private String dcePath;
-
-    @FormLabel("Default ASPIDE Location")
+    @FormLabel("Default Location")
     private String location;
 
+    @FormLabel("Kubernetes configuration file (optional)")
+    @FormPropertyDefinition(type = "boolean")
+    private Boolean kube;
 
-    @FormLabel("Tosca Metadata Providers")
-    private List<String> providers;
+    @FormLabel("URL")
+    private String kubeURL;
+
+    @FormLabel("CA cert data")
+    private String cacertData;
+
+    @FormLabel("Username")
+    private String kubeUsername;
+
+    @FormLabel("Token")
+    private String kubeToken;
+
+    @FormLabel("Namespace")
+    private String kubeNamespace;
+
+
+
+//    @FormLabel("Tosca Metadata Providers")
+//    private List<String> providers;
 }

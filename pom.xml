@@ -10,12 +10,12 @@
     <parent>
         <groupId>alien4cloud</groupId>
         <artifactId>alien4cloud-parent</artifactId>
-        <version>3.6.0-SNAPSHOT</version>
+        <version>3.8.0-SNAPSHOT</version>
     </parent>
 
-<!--    <groupId>alien4cloud</groupId>-->
+    <groupId>alien4cloud</groupId>
     <artifactId>tufa-a4c-orchestrator</artifactId>
-<!--    <version>1.0.0-SNAPSHOT</version>-->
+    <version>3.8.0-SNAPSHOT</version>
 
     <name>TUFA A4C Orchestrator plugin</name>
     <description>
