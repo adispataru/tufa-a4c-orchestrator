@@ -89,6 +89,8 @@ public class SerranoMappingService {
                         node.getTemplate().getRequirements().get("host").getType().equals("tosca.capabilities.Container")
         ).collect(Collectors.toList());
         nonNatives.removeAll(iaasNodes);
+        Map<String, NodeTemplate> matchedNodes = paaSTopologyDeploymentContext.getDeploymentTopology().getMatchReplacedNodes();
+
 
         nonNatives.forEach(node -> {
             // Find volumes attached to the node
@@ -286,6 +288,7 @@ public class SerranoMappingService {
                             .withNewSpec()
                             .withStorageClassName(storageClass)
                             .withAccessModes(accessModes)
+                            .withHostPath(new HostPathVolumeSource("/mnt/data-"+volName, "DirectoryOrCreate"))
                             .withCapacity(Map.of("storage", new Quantity(size, "Gi")))
                                     .endSpec().build();
 

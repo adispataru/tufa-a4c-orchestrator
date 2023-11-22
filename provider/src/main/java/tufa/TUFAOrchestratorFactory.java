@@ -57,7 +57,7 @@ public class TUFAOrchestratorFactory implements IOrchestratorPluginFactory<TUFAO
 //                ToscaMeta
 //                DefaultToscaTypeProvider.class.getName(),
 //                BrooklynToscaTypeProvider.class.getName());
-        return new Configuration("https://ai-so.serrano.eu", "83.212.102.89:1883", "https://on-premise-storage-gateway.services.cloud.ict-serrano.eu/s3", "serrano_user", "password", "Cloud", false, null, null, null, null, null);
+        return new Configuration("https://ai-so.serrano.eu", "83.212.102.89:1883", "https://on-premise-storage-gateway.services.cloud.ict-serrano.eu/s3", "serrano_user", "password", "Cloud", false, null, null,  null, null);
     }
 
     @Override

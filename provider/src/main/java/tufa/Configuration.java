@@ -14,7 +14,7 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@FormProperties({ "AIUrl", "dataBrokerUrl", "storageServiceUrl", "user", "password", "location", "kube", "kubeURL", "cacertData", "kubeUsername", "kubeToken", "kubeNamespace"})
+@FormProperties({ "AIUrl", "dataBrokerUrl", "storageServiceUrl", "user", "password", "location", "kube", "kubeURL", "cacertData", "kubeToken", "kubeNamespace"})
 public class Configuration {
 
     @FormLabel("AI-Enhanced Service Orchestrator URL")
@@ -42,7 +42,7 @@ public class Configuration {
     @FormLabel("Default Location")
     private String location;
 
-    @FormLabel("Kubernetes configuration file (optional)")
+    @FormLabel("Kubernetes configuration (optional)")
     @FormPropertyDefinition(type = "boolean")
     private Boolean kube;
 
@@ -52,11 +52,13 @@ public class Configuration {
     @FormLabel("CA cert data")
     private String cacertData;
 
-    @FormLabel("Username")
-    private String kubeUsername;
-
     @FormLabel("Token")
     private String kubeToken;
+
+//    @FormLabel("Username")
+//    private String kubeUsername;
+
+
 
     @FormLabel("Namespace")
     private String kubeNamespace;

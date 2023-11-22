@@ -16,6 +16,8 @@ import com.google.gson.JsonObject;
 import io.fabric8.kubernetes.api.model.*;
 import io.fabric8.kubernetes.api.model.apps.Deployment;
 import io.fabric8.kubernetes.api.model.apps.DeploymentCondition;
+import io.fabric8.kubernetes.api.model.storage.StorageClass;
+import io.fabric8.kubernetes.api.model.storage.StorageClassBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.utils.Serialization;
 import lombok.SneakyThrows;
@@ -31,6 +33,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.collect.Maps.newHashMap;
 
@@ -58,6 +61,7 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
     @Autowired
     @Qualifier("alien-es-dao")
     private IGenericSearchDAO alienDAO;
+
 
     @Autowired
     private BeanFactory beanFactory;
@@ -242,17 +246,67 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
             nodeName = nodeName.substring(0, nodeName.indexOf('-'));
 
             if(serranoApp.getVolumeClaims().get(nodeName) != null) {
-                for (PersistentVolumeClaim claim : serranoApp.getVolumeClaims().get(nodeName)) {
+                List<StorageClass> storageClasses = kubeClient.storage().v1().storageClasses().list().getItems();
+                boolean pvManagedStorage = false;
+                if(storageClasses != null && storageClasses.size() > 0){
+                    if(storageClasses.size() == 1 && storageClasses.get(0).getMetadata().getName().equals("local-storage"))
+                        pvManagedStorage = true;
+                }else{
+                    StorageClass storageClass = new StorageClassBuilder().withNewMetadata()
+                            .withName("local-storage")
+                            .endMetadata()
+                            .withProvisioner("kubernetes.io/no-provisioner")
+                            .withVolumeBindingMode("WaitForFirstConsumer")
+                            .build();
+                    kubeClient.storage().v1().storageClasses().resource(storageClass).create();
+                }
+
+
+                List<PersistentVolumeClaim> pvcs = serranoApp.getVolumeClaims().get(nodeName);
+                for (int i = 0; i < pvcs.size(); i++) {
+                    PersistentVolumeClaim claim = pvcs.get(i);
+
+
+                    if(pvManagedStorage){
+                        PersistentVolume pv = serranoApp.getVolumes().get(nodeName).get(i);
+                        pv.getSpec().setStorageClassName("local-storage");
+                        claim.getSpec().setStorageClassName("local-storage");
+                        if(claim.getSpec().getStorageClassName().equals("persistent")) {
+                            pv.getSpec().setPersistentVolumeReclaimPolicy("Retain");
+                        }
+                        PersistentVolume existingPV = kubeClient.persistentVolumes().withName(pv.getMetadata().getName()).get();
+                        if(existingPV == null){
+                            PersistentVolume cpv = kubeClient.persistentVolumes().resource(pv).create();
+                            log.info("Persistent Volume '" + cpv.getMetadata().getName() + "' created.");
+                        }
+                    }else{
+                        AtomicReference<String> className = new AtomicReference<>("local-storage");
+                        kubeClient.storage().v1().storageClasses().list().getItems().forEach(storageClass -> {
+                            if(claim.getSpec().getStorageClassName().equals("persistent")) {
+                                if (storageClass.getMetadata().getName().equals("nlsas-01-retain")){
+                                    className.set(storageClass.getMetadata().getName());
+                                }
+                            }else{
+                                if (storageClass.getMetadata().getName().equals("nlsas-01")){
+                                    className.set(storageClass.getMetadata().getName());
+                                }
+                            }
+                        });
+                        log.info("Using storageClassName: " + className.get());
+                        claim.getSpec().setStorageClassName(className.get());
+                    }
 
                     PersistentVolumeClaim existingPVC = kubeClient.persistentVolumeClaims().withName(claim.getMetadata().getName()).get();
 
                     if (existingPVC != null) {
-                        kubeClient.persistentVolumeClaims().resource(claim).delete();
-                        kubeClient.persistentVolumeClaims().resource(claim).create();
-                        log.info("Persistent Volume Claim '" + claim.getMetadata().getName() + "' updated.");
+                        if(!existingPVC.equals(claim)) {
+                            kubeClient.persistentVolumeClaims().resource(existingPVC).delete();
+                            kubeClient.persistentVolumeClaims().resource(claim).create();
+                            log.info("Persistent Volume Claim '" + claim.getMetadata().getName() + "' deleted and recreated.");
+                        }
+                        log.info("Persistent Volume Claim '" + claim.getMetadata().getName() + "' exists.");
                     } else {
-                        // Create the PV
-
+                        // Create the PVC
                         existingPVC = kubeClient.persistentVolumeClaims().resource(claim).create();
                         log.info("Persistent Volume Claim '" + existingPVC.getMetadata().getName() + "' has been created.");
                     }
@@ -293,8 +347,7 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
                         kubeClient.services().resource(service).update();
                         log.info("Service '" + service.getMetadata().getName() + "' updated.");
                     } else {
-                        // Create the PV
-
+                        // Create the Service
                         existingService = kubeClient.services().resource(service).create();
                         log.info("Service '" + existingService.getMetadata().getName() + "' has been created.");
                     }
@@ -332,13 +385,27 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
                 nodeName = nodeName.substring(0, nodeName.indexOf('-'));
 
                 if (serranoApp.getVolumeClaims().get(nodeName) != null) {
-                    for (PersistentVolumeClaim claim : serranoApp.getVolumeClaims().get(nodeName)) {
+                    List<PersistentVolumeClaim> pvcs = serranoApp.getVolumeClaims().get(nodeName);
+                    List<PersistentVolume> persistentVolumes = serranoApp.getVolumes().get(nodeName);
+                    for (int i = 0; i < pvcs.size(); i++) {
+                        PersistentVolumeClaim claim = pvcs.get(i);
 
                         PersistentVolumeClaim existingPVC = kubeClient.persistentVolumeClaims().withName(claim.getMetadata().getName()).get();
 
                         if (existingPVC != null) {
-                            kubeClient.persistentVolumeClaims().resource(claim).delete();
-                            log.info("Persistent Volume Claim '" + claim.getMetadata().getName() + "' deleted.");
+                            kubeClient.persistentVolumeClaims().resource(existingPVC).delete();
+                            log.info("Persistent Volume Claim '" + existingPVC.getMetadata().getName() + "' deleted.");
+                        }
+                        PersistentVolume pv = persistentVolumes.get(i);
+
+                        try {
+                            PersistentVolume existingPV = kubeClient.persistentVolumes().withName(pv.getMetadata().getName()).get();
+                            if (existingPV != null) {
+                                kubeClient.persistentVolumes().resource(existingPV).delete();
+                                log.info("Perxistent Volume '" + existingPV.getMetadata().getName() + "' deleted.");
+                            }
+                        }catch (Exception e){
+                            log.info("Cannot check if a PV has been created due to permission error.");
                         }
                     }
                 }

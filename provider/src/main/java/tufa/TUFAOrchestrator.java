@@ -37,6 +37,7 @@ public class TUFAOrchestrator extends TUFAProvider implements IOrchestratorPlugi
 
     @Inject
     private TUFALocationConfigurerFactory tufaLocationConfigurerFactory;
+    private boolean kubeOk = false;
 
     @Override
     public ILocationConfiguratorPlugin getConfigurator(String locationType) {
@@ -57,10 +58,12 @@ public class TUFAOrchestrator extends TUFAProvider implements IOrchestratorPlugi
         l.setName("SERRANO");
         l.setInfrastructureType("SERRANO");
         newLocations.add(l);
-        Location l2 = new Location();
-        l2.setName("Kubernetes");
-        l2.setInfrastructureType("Kubernetes");
-        newLocations.add(l2);
+        if(kubeOk) {
+            Location l2 = new Location();
+            l2.setName("Kubernetes");
+            l2.setInfrastructureType("Kubernetes");
+            newLocations.add(l2);
+        }
         return newLocations;
     }
 
@@ -83,12 +86,16 @@ public class TUFAOrchestrator extends TUFAProvider implements IOrchestratorPlugi
             if(configuration.getKube()) {
                 // Create a Kubernetes client configuration from the custom configuration file
 //                Config config = Config.fromKubeconfig(kubeConfig);
-                Config config = new ConfigBuilder().withCaCertData(configuration.getCacertData())
+                ConfigBuilder configBuilder = new ConfigBuilder().withCaCertData(configuration.getCacertData())
                         .withMasterUrl(configuration.getKubeURL())
-                        .withUsername(configuration.getKubeUsername())
-                        .withOauthToken(configuration.getKubeToken())
-                        .withNamespace(configuration.getKubeNamespace()).build();
+//                        .withUsername(configuration.getKubeUsername())
+                        .withOauthToken(configuration.getKubeToken());
+                        if(configuration.getKubeNamespace() != null) {
+                            configBuilder = configBuilder.withNamespace(configuration.getKubeNamespace());
+                        }
 
+
+                Config config = configBuilder.build();
                 // Initialize the Kubernetes client
                 try {
                     kubeClient = new DefaultKubernetesClient(config);
@@ -98,29 +105,12 @@ public class TUFAOrchestrator extends TUFAProvider implements IOrchestratorPlugi
                         System.out.println("Pod Name: " + pod.getMetadata().getName());
                     });
                     log.info("Successfully connected to Kubernetes cluster");
+                    kubeOk = true;
                 } catch (Exception e) {
                     log.info("Could not initialize Kubernetes client, with provided credentials");
+                    log.info(e.toString());
                 }
             }
-
-//            catalogMapper.addBaseTypes();
-
-//            List<ToscaTypeProvider> metadataProviders = new LinkedList<>();
-//            for (String providerClass : configuration.getProviders()) {
-//                try {
-//                    Object provider = beanFactory.getBean(Class.forName(providerClass));
-//                    if(provider instanceof RequiresBrooklynApi) {
-//                        ((RequiresBrooklynApi) provider).setBrooklynApi(getNewBrooklynApi());
-//                    }
-//                    // Alien UI has higher priority items at the end of the list.
-//                    // Reverse the order here.
-//                    metadataProviders.add(0, ToscaTypeProvider.class.cast(provider));
-//                } catch (ClassNotFoundException e) {
-//                    log.warn("Could not load metadata provider " + providerClass, e);
-//                }
-//            }
-
-//            catalogMapper.mapBrooklynEntities(getNewBrooklynApi(), new ToscaMetadataProvider(metadataProviders));
 
         } finally {
             revertContextClassLoader();
