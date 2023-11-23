@@ -33,6 +33,7 @@ import io.jsonwebtoken.lang.Maps;
 import org.alien4cloud.tosca.model.definitions.*;
 import org.alien4cloud.tosca.model.templates.Capability;
 import org.alien4cloud.tosca.model.templates.NodeTemplate;
+import org.alien4cloud.tosca.model.templates.ServiceNodeTemplate;
 import org.alien4cloud.tosca.utils.InterfaceUtils;
 import org.apache.commons.lang.NotImplementedException;
 import org.slf4j.Logger;
@@ -117,7 +118,7 @@ public class SerranoMappingService {
                 return;
             if(node.getIndexedToscaElement().isAbstract())
                 return;
-            updateAppDefinitionWithDependencies(node, paaSTopologyDeploymentContext.getPaaSTopology(), serranoApp);
+            updateAppDefinitionWithDependencies(node, paaSTopologyDeploymentContext, serranoApp);
         });
 
         return serranoApp;
@@ -330,7 +331,7 @@ public class SerranoMappingService {
                     // If this node's capability is targeted by a relationship, we may already have pre-allocated a service port for it
                     final String serviceID = nodeName.concat(name);
 
-                    //TODO HEre a kube Service must be created to deal with the ports and DNS
+                    //TODO HEre a kube Ingress must also be created to deal with the ports and DNS in case of public IPs
                     io.fabric8.kubernetes.api.model.Service tcp = new ServiceBuilder().withNewMetadata()
                             .withName(serviceID)
                             .endMetadata()
@@ -411,7 +412,8 @@ public class SerranoMappingService {
         serranoApp.getConstraints().put(nodeName, constraint);
     }
 
-    private void updateAppDefinitionWithDependencies(PaaSNodeTemplate paaSNodeTemplate, PaaSTopology paaSTopology, SerranoApp serranoApp) {
+    private void updateAppDefinitionWithDependencies(PaaSNodeTemplate paaSNodeTemplate, PaaSTopologyDeploymentContext deploymentContext, SerranoApp serranoApp) {
+        PaaSTopology paaSTopology = deploymentContext.getPaaSTopology();
         final NodeTemplate nodeTemplate = paaSNodeTemplate.getTemplate();
         String nodeName = nodeTemplate.getName().toLowerCase();
         String deploymentName = nodeName + "-" + serranoApp.getId();
@@ -438,7 +440,7 @@ public class SerranoMappingService {
                 if(key.startsWith("INPUT_")) {
 
                     // Inputs can either be a ScalarValue or a pointer to a capability targeted by one of the node's requirements
-                    String actualValue = retrieveValue(paaSNodeTemplate, paaSTopology, value, serranoApp);
+                    String actualValue = retrieveValue(paaSNodeTemplate, deploymentContext, value, serranoApp);
 
                     addInputParameter(kubeConfigMap, key, actualValue);
                 }
@@ -459,30 +461,31 @@ public class SerranoMappingService {
     }
 
 
-    public String retrieveValue(PaaSNodeTemplate paaSNodeTemplate, PaaSTopology paaSTopology, IValue val, SerranoApp serranoApp) {
+    public String retrieveValue(PaaSNodeTemplate paaSNodeTemplate, PaaSTopologyDeploymentContext deploymentContext, IValue val, SerranoApp serranoApp) {
+        PaaSTopology paaSTopology = deploymentContext.getPaaSTopology();
         String value = "";
 
         if (val instanceof FunctionPropertyValue && "get_property".equals(((FunctionPropertyValue) val).getFunction())){
             FunctionPropertyValue fVal = (FunctionPropertyValue) val;
-            log.info("Template name " + fVal.getTemplateName());
-            log.info("Function name " + fVal.getFunction());
-            log.info("Operation name " + fVal.getOperationName());
-            log.info("Element name to fetch " + fVal.getElementNameToFetch());
-            log.info("Capability or requirement name " + fVal.getCapabilityOrRequirementName());
-            log.info("Parameters " + fVal.getParameters().toString());
+//            log.info("Template name " + fVal.getTemplateName());
+//            log.info("Function name " + fVal.getFunction());
+//            log.info("Operation name " + fVal.getOperationName());
+//            log.info("Element name to fetch " + fVal.getElementNameToFetch());
+//            log.info("Capability or requirement name " + fVal.getCapabilityOrRequirementName());
+//            log.info("Parameters " + fVal.getParameters().toString());
             if("REQ_TARGET".equals(fVal.getTemplateName())) {
                 // Get property of a requirement's targeted capability
-                value = getPropertyFromReqTarget(paaSNodeTemplate, paaSTopology, fVal, serranoApp);
+                value = getPropertyFromReqTarget(paaSNodeTemplate, deploymentContext, fVal, serranoApp);
             }else if("SELF".equals(fVal.getTemplateName())){
                 // Get property of a capability
-                value = getPropertyFromSelf(paaSNodeTemplate, paaSTopology, fVal, serranoApp);
+                value = getPropertyFromSelf(paaSNodeTemplate, deploymentContext, fVal, serranoApp);
             }
         } else if (val instanceof ScalarPropertyValue)
             value = ((ScalarPropertyValue) val).getValue();
         else if(val instanceof ConcatPropertyValue){
             StringBuilder sb = new StringBuilder("");
             for( IValue iValue : ((ConcatPropertyValue) val).getParameters()){
-                sb.append(retrieveValue(paaSNodeTemplate, paaSTopology, iValue, serranoApp));
+                sb.append(retrieveValue(paaSNodeTemplate, deploymentContext, iValue, serranoApp));
             }
             value = sb.toString();
         }
@@ -493,16 +496,19 @@ public class SerranoMappingService {
      * Search for a property of a capability being required as a target of a relationship.
      *
      * @param paaSNodeTemplate The source node of the relationships, wich defines the requirement.
-     * @param paaSTopology     the topology the node belongs to.
+     * @param deploymentContext     the topology the node belongs to.
      * @param params           the function parameters, e.g. the requirement name & property name to lookup.
      * @param serranoApp
      * @return a String representing the property value.
      */
-    private String getPropertyFromReqTarget(PaaSNodeTemplate paaSNodeTemplate, PaaSTopology paaSTopology, FunctionPropertyValue params, SerranoApp serranoApp) {
+    private String getPropertyFromReqTarget(PaaSNodeTemplate paaSNodeTemplate, PaaSTopologyDeploymentContext deploymentContext, FunctionPropertyValue params, SerranoApp serranoApp) {
         // Search for the requirement's target by filter the relationships' templates of this node.
         // If a target is found, then lookup for the given property name in its capabilities.
         // For Docker containers X Marathon, the orchestrator replaces the PORT and IP_ADDRESS by the target's service port and the load balancer hostname
         // respectively.
+
+        PaaSTopology paaSTopology = deploymentContext.getPaaSTopology();
+        Map<String, NodeTemplate> matchedNodes = deploymentContext.getDeploymentTopology().getMatchReplacedNodes();
 
         String requirementName = params.getCapabilityOrRequirementName();
         String propertyName = params.getElementNameToFetch();
@@ -520,6 +526,9 @@ public class SerranoMappingService {
 
                         log.info("ConnectTo relationship");
                         String url = null;
+                        String port = null;
+                        String user = null;
+                        String password = null;
                         String nodeName = paaSNodeTemplate.getTemplate().getName().toLowerCase();
                         if (target.getIndexedToscaElement().isAbstract()) {
                             //The target service is provided by Serrano
@@ -528,10 +537,17 @@ public class SerranoMappingService {
                                 serranoApp.getDependencies().get(nodeName).remove(target.getId());
                             }
 
-                            if (target.getIndexedToscaElement().getId().contains("serrano.nodes.DataBroker"))
-                                url = configuration.getDataBrokerUrl();
-                            if (target.getIndexedToscaElement().getId().contains("serrano.nodes.SecureStorage"))
-                                url = configuration.getStorageServiceUrl();
+                            if(matchedNodes.containsKey(target.getId())){
+                                NodeTemplate node = matchedNodes.get(target.getId());
+                                if(node instanceof ServiceNodeTemplate) {
+                                    Map<String, String> attributes = ((ServiceNodeTemplate) node).getAttributeValues();
+                                    url = attributes.get("endpoint");
+                                    user = attributes.get("username");
+                                    password = attributes.get("password");
+
+                                }
+                            }
+
                         } else {
                             // TODO If the IP is public, then I can get it from kubernetes
 //                            String frontendServiceIP = client.services().withName("frontend-service").get().getStatus().getLoadBalancer().getIngress().get(0).getIp();
@@ -541,7 +557,7 @@ public class SerranoMappingService {
                             url = target.getTemplate().getName().toLowerCase() + targetedCapabilityName;
                         }
                         if ("port".equalsIgnoreCase(propertyName)) {
-                            String port = "80";
+                            port = "80";
                             if (url != null) {
                                 String[] tokens = url.split(":");
                                 if (url.startsWith("http")) {
@@ -570,6 +586,10 @@ public class SerranoMappingService {
                             return address;
                         } else if ("url".equalsIgnoreCase(propertyName)) {
                             return url;
+                        } else if ("user".equalsIgnoreCase(propertyName)){
+                            return user;
+                        } else if ("password".equalsIgnoreCase(propertyName)){
+                            return password;
                         }
                         return target.getTemplate().getName().toLowerCase() + targetedCapabilityName;
                     }else {
@@ -583,11 +603,13 @@ public class SerranoMappingService {
     }
 
 
-    public String getPropertyFromSelf(PaaSNodeTemplate paaSNodeTemplate, PaaSTopology paaSTopology, FunctionPropertyValue params, SerranoApp serranoApp) {
+    public String getPropertyFromSelf(PaaSNodeTemplate paaSNodeTemplate, PaaSTopologyDeploymentContext deploymentContext, FunctionPropertyValue params, SerranoApp serranoApp) {
         // Search for the requirement's target by filter the relationships' templates of this node.
         // If a target is found, then lookup for the given property name in its capabilities.
         // For Docker containers X Marathon, the orchestrator replaces the PORT and IP_ADDRESS by the target's service port and the load balancer hostname
         // respectively.
+
+        PaaSTopology paaSTopology = deploymentContext.getPaaSTopology();
 
         String capabilityName = params.getCapabilityOrRequirementName();
         String propertyName = params.getElementNameToFetch();
@@ -607,7 +629,7 @@ public class SerranoMappingService {
                         if(!port.equals("0")){
                             return port;
                         }else {
-                            portProp = value.getProperties().get("docker_bridge_port_mapping");
+                            portProp = value.getProperties().get("port");
                             if (portProp instanceof ScalarPropertyValue)
                                 port = ((ScalarPropertyValue) portProp).getValue();
                             if (!port.equals("0")) {
@@ -620,9 +642,8 @@ public class SerranoMappingService {
                     else if ("ip_address".equalsIgnoreCase(propertyName))
                         // TODO: If there is no service port, return <target_app_id>.marathon.mesos for DNS resolution
 
-                        // Special marathon case: return marathon-lb hostname if an ip_address is required.
-//                            return relationshipTemplate.getTemplate().getTarget() + ".marathon.mesos";
-                        return "marathon-lb.marathon.mesos";
+
+                        return paaSNodeTemplate.getTemplate().getName() + capabilityName;
 
                     // Nominal case : get the requirement's targeted capability property.
                     // TODO: Add the REQ_TARGET keyword in the evaluateGetProperty function so this is evaluated at parsing

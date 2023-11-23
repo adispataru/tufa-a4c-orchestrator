@@ -14,30 +14,31 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@FormProperties({ "AIUrl", "dataBrokerUrl", "storageServiceUrl", "user", "password", "location", "kube", "kubeURL", "cacertData", "kubeToken", "kubeNamespace"})
+//@FormProperties({ "AIUrl", "dataBrokerUrl", "storageServiceUrl", "user", "password", "location", "kube", "kubeURL", "cacertData", "kubeToken", "kubeNamespace"})
+@FormProperties({ "AIUrl", "location", "kube", "kubeURL", "cacertData", "kubeToken", "kubeNamespace"})
 public class Configuration {
 
     @FormLabel("AI-Enhanced Service Orchestrator URL")
-    @FormPropertyConstraint(pattern = "http\\:.+(?:\\d+)")
+    @FormPropertyConstraint(pattern = "http[s]*\\:.+(?:\\d+)")
     @NotNull
     private String AIUrl;
 
-    @FormLabel("Serrano Data Broker URL")
-    @FormPropertyConstraint(pattern = "http\\:.+(?:\\d+)")
-    @NotNull
-    private String dataBrokerUrl;
+//    @FormLabel("Serrano Data Broker URL")
+//    @FormPropertyConstraint(pattern = "http\\:.+(?:\\d+)")
+//    @NotNull
+//    private String dataBrokerUrl;
 
-    @FormLabel("Serrano Storage Service URL")
-    @FormPropertyConstraint(pattern = "http\\:.+(?:\\d+)")
-    @NotNull
-    private String storageServiceUrl;
+//    @FormLabel("Serrano Storage Service URL")
+//    @FormPropertyConstraint(pattern = "http\\:.+(?:\\d+)")
+//    @NotNull
+//    private String storageServiceUrl;
 
-    @FormLabel("Serrano SDK User")
-    private String user;
+//    @FormLabel("Serrano SDK User")
+//    private String user;
 
-    @FormLabel("Serrano SDK Password")
-    @FormPropertyDefinition(type = "string", isPassword = true)
-    private String password;
+//    @FormLabel("Serrano SDK Password")
+//    @FormPropertyDefinition(type = "string", isPassword = true)
+//    private String password;
 
     @FormLabel("Default Location")
     private String location;
