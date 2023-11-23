@@ -467,12 +467,6 @@ public class SerranoMappingService {
 
         if (val instanceof FunctionPropertyValue && "get_property".equals(((FunctionPropertyValue) val).getFunction())){
             FunctionPropertyValue fVal = (FunctionPropertyValue) val;
-//            log.info("Template name " + fVal.getTemplateName());
-//            log.info("Function name " + fVal.getFunction());
-//            log.info("Operation name " + fVal.getOperationName());
-//            log.info("Element name to fetch " + fVal.getElementNameToFetch());
-//            log.info("Capability or requirement name " + fVal.getCapabilityOrRequirementName());
-//            log.info("Parameters " + fVal.getParameters().toString());
             if("REQ_TARGET".equals(fVal.getTemplateName())) {
                 // Get property of a requirement's targeted capability
                 value = getPropertyFromReqTarget(paaSNodeTemplate, deploymentContext, fVal, serranoApp);

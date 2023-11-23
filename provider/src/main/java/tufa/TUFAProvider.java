@@ -67,12 +67,6 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
     private BeanFactory beanFactory;
 
     @Autowired
-    private SOEClient soeClient;
-
-    @Autowired
-    private SOEMappingService soeMappingService;
-
-    @Autowired
     protected SerranoMappingService serranoMappingService;
 
     ThreadLocal<ClassLoader> oldContextClassLoader = new ThreadLocal<ClassLoader>();
