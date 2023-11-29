@@ -9,6 +9,7 @@ import alien4cloud.paas.IPaaSCallback;
 import alien4cloud.paas.exception.MaintenanceModeException;
 import alien4cloud.paas.exception.OperationExecutionException;
 import alien4cloud.paas.model.*;
+import alien4cloud.rest.utils.RestClient;
 import com.google.common.base.Optional;
 import com.google.common.collect.Maps;
 import com.google.gson.JsonArray;
@@ -43,19 +44,17 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
     protected Configuration configuration;
 
     protected KubernetesClient kubeClient;
+    protected SerranoRestClient aisoClient;
+
+
 
 
     protected Map<String,PaaSTopologyDeploymentContext> knownDeployments = Maps.newConcurrentMap();
     protected Map<String, Optional<DeploymentStatus>> deploymentStatuses = Maps.newConcurrentMap();
 
-    @Autowired
-    private ApplicationService applicationService;
 
     @Autowired
     private EventService eventService;
-
-    @Autowired
-    private LocationService locationService;
 
 
     @Autowired

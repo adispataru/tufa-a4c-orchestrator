@@ -1,20 +1,23 @@
 package tufa;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import javax.inject.Inject;
 
 import alien4cloud.model.runtime.Execution;
 import alien4cloud.paas.exception.PluginConfigurationException;
 import alien4cloud.paas.model.PaaSTopologyDeploymentContext;
+import alien4cloud.rest.utils.RestClient;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.message.BasicHeader;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
@@ -38,6 +41,7 @@ public class TUFAOrchestrator extends TUFAProvider implements IOrchestratorPlugi
     @Inject
     private TUFALocationConfigurerFactory tufaLocationConfigurerFactory;
     private boolean kubeOk = false;
+    private boolean aisoOk = false;
 
     @Override
     public ILocationConfiguratorPlugin getConfigurator(String locationType) {
@@ -54,10 +58,13 @@ public class TUFAOrchestrator extends TUFAProvider implements IOrchestratorPlugi
     public List<Location> getLocations() {
 //        List<LocationSummary> locations = getNewBrooklynApi().getLocationApi().list();
         List<Location> newLocations = Lists.newArrayList();
-        Location l = new Location();
-        l.setName("SERRANO");
-        l.setInfrastructureType("SERRANO");
-        newLocations.add(l);
+
+        if(aisoOk) {
+            Location l = new Location();
+            l.setName("SERRANO");
+            l.setInfrastructureType("SERRANO");
+            newLocations.add(l);
+        }
         if(kubeOk) {
             Location l2 = new Location();
             l2.setName("Kubernetes");
@@ -82,6 +89,23 @@ public class TUFAOrchestrator extends TUFAProvider implements IOrchestratorPlugi
         try {
             log.info("INIT: " + activeDeployments);
 
+
+            if(configuration.getAiURL() != null && !configuration.getAiURL().isEmpty()){
+                String url = configuration.getAiURL();
+                aisoClient = new SerranoRestClient(url);
+                List<NameValuePair> headers = new ArrayList<>();
+                headers.add(new BasicHeader("Content-Type", "application/json"));
+
+                try {
+                    CloseableHttpResponse response = aisoClient.getUrlEncoded("/", headers);
+                    if(response.getStatusLine().getStatusCode() == 200)
+                        aisoOk = true;
+                } catch (IOException | URISyntaxException e) {
+                    log.info("Could not initialize AI-SO client, with provided URL");
+                    log.info(e.toString());
+                }
+
+            }
 
             if(configuration.getKube()) {
                 // Create a Kubernetes client configuration from the custom configuration file
