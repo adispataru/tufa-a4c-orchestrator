@@ -57,7 +57,9 @@ public class TUFAOrchestratorFactory implements IOrchestratorPluginFactory<TUFAO
 //                ToscaMeta
 //                DefaultToscaTypeProvider.class.getName(),
 //                BrooklynToscaTypeProvider.class.getName());
-        return new Configuration("https://ai-enhanced-service-orchestrator.services.cloud.ict-serrano.eu/AISO/", false, null, null,  null, null);
+        return new Configuration(true, "https://ai-enhanced-service-orchestrator.services.cloud.ict-serrano.eu/AISO/",
+                "https://resource-orchestrator.services.cloud.ict-serrano.eu/api/v1",
+                "http://85.120.206.26:30070/api/v1", false, null, null,  null, null);
     }
 
     @Override

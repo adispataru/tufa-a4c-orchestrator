@@ -14,13 +14,23 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@FormProperties({ "aiURL", "kube", "kubeURL", "cacertData", "kubeToken", "kubeNamespace"})
+@FormProperties({ "serrano", "aiURL", "roURL", "telemetryURL", "kube", "kubeURL", "cacertData", "kubeToken", "kubeNamespace"})
 public class Configuration {
 
-    @FormLabel("AI-Enhanced Service Orchestrator URL")
-    @FormPropertyConstraint(pattern = "https\\:.+(?:\\d+)")
-    @NotNull
+    @FormLabel("SERRANO Infrastructure")
+    @FormPropertyDefinition(type = "boolean")
+    private Boolean serrano;
+
+    @FormLabel("AI-SO URL")
+//    @FormPropertyConstraint(pattern = "https\\:.+(?:\\d+)")
+//    @NotNull
     private String aiURL;
+
+    @FormLabel("Resource Orc. URL")
+    private String roURL;
+
+    @FormLabel("Telemetry URL")
+    private String telemetryURL;
 
     @FormLabel("Kubernetes configuration (optional)")
     @FormPropertyDefinition(type = "boolean")

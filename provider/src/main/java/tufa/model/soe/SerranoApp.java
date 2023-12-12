@@ -27,14 +27,21 @@ public class SerranoApp {
     private String dockerCFG;
 
     private Map<String, Map<String, Service>> services;
-    private Map<String, MarathonEventService> marathonEvents;
     private Map<String, Object> deployedApps;
     private String id   ;
+    private String serranoUUID;
+
+    public String getSerranoUUID() {
+        return serranoUUID;
+    }
+
+    public void setSerranoUUID(String serranoUUID) {
+        this.serranoUUID = serranoUUID;
+    }
 
     public SerranoApp(){
         this.deployments = new ArrayList<>();
         this.dependencies = new HashMap<>();
-        this.marathonEvents = new HashMap<>();
         this.deployedApps = new HashMap<>();
         this.configMaps = new HashMap<>();
         this.volumes = new HashMap<>();
@@ -99,14 +106,6 @@ public class SerranoApp {
 
     public void setDependencies(Map<String, List<String>> dependencies) {
         this.dependencies = dependencies;
-    }
-
-    public Map<String, MarathonEventService> getMarathonEvents() {
-        return marathonEvents;
-    }
-
-    public void setMarathonEvents(Map<String, MarathonEventService> marathonEvents) {
-        this.marathonEvents = marathonEvents;
     }
 
     public Map<String, Object> getDeployedApps() {

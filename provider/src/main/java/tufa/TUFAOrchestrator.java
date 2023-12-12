@@ -2,19 +2,15 @@ package tufa;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 import javax.inject.Inject;
 
 import alien4cloud.model.runtime.Execution;
 import alien4cloud.paas.exception.PluginConfigurationException;
 import alien4cloud.paas.model.PaaSTopologyDeploymentContext;
-import alien4cloud.rest.utils.RestClient;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
-import io.fabric8.kubernetes.client.KubernetesClient;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.message.BasicHeader;
@@ -41,7 +37,10 @@ public class TUFAOrchestrator extends TUFAProvider implements IOrchestratorPlugi
     @Inject
     private TUFALocationConfigurerFactory tufaLocationConfigurerFactory;
     private boolean kubeOk = false;
-    private boolean aisoOk = false;
+    private boolean serranoOK = false;
+
+    public static final String SERRANO_LOCATION = "SERRANO";
+    public static final String KUBE_LOCATION = "Kubernetes";
 
     @Override
     public ILocationConfiguratorPlugin getConfigurator(String locationType) {
@@ -59,16 +58,16 @@ public class TUFAOrchestrator extends TUFAProvider implements IOrchestratorPlugi
 //        List<LocationSummary> locations = getNewBrooklynApi().getLocationApi().list();
         List<Location> newLocations = Lists.newArrayList();
 
-        if(aisoOk) {
+        if(serranoOK) {
             Location l = new Location();
-            l.setName("SERRANO");
-            l.setInfrastructureType("SERRANO");
+            l.setName(SERRANO_LOCATION);
+            l.setInfrastructureType(SERRANO_LOCATION);
             newLocations.add(l);
         }
         if(kubeOk) {
             Location l2 = new Location();
-            l2.setName("Kubernetes");
-            l2.setInfrastructureType("Kubernetes");
+            l2.setName(KUBE_LOCATION);
+            l2.setInfrastructureType(KUBE_LOCATION);
             newLocations.add(l2);
         }
         return newLocations;
@@ -90,16 +89,33 @@ public class TUFAOrchestrator extends TUFAProvider implements IOrchestratorPlugi
             log.info("INIT: " + activeDeployments);
 
 
-            if(configuration.getAiURL() != null && !configuration.getAiURL().isEmpty()){
+            if(configuration.getSerrano()){
                 String url = configuration.getAiURL();
                 aisoClient = new SerranoRestClient(url);
+                roClient = new SerranoRestClient(configuration.getRoURL());
+                telemetryClient = new SerranoRestClient(configuration.getTelemetryURL());
                 List<NameValuePair> headers = new ArrayList<>();
                 headers.add(new BasicHeader("Content-Type", "application/json"));
 
                 try {
                     CloseableHttpResponse response = aisoClient.getUrlEncoded("/", headers);
-                    if(response.getStatusLine().getStatusCode() == 200)
-                        aisoOk = true;
+                    CloseableHttpResponse responseRO = roClient.getUrlEncoded("/orchestrator/deployments", headers);
+                    CloseableHttpResponse responseTel = telemetryClient.getUrlEncoded("/telemetry/central/deployments", headers);
+                    if(response.getStatusLine().getStatusCode() == 200 &&
+                            responseRO.getStatusLine().getStatusCode() == 200 &&
+                            responseTel.getStatusLine().getStatusCode() == 200
+                    ) {
+                        serranoOK = true;
+                        log.info("Successfully connected to Serrano components");
+                    }else{
+                        log.info("Could not Serrano clients, with provided URLs");
+                        log.info("AI-SO " + response.getStatusLine().getStatusCode());
+                        log.info("Resource Orc. (RO) " + responseRO.getStatusLine().getStatusCode());
+                        log.info("Telemetry " + responseTel.getStatusLine().getStatusCode());
+                    }
+                    response.close();
+                    responseRO.close();
+                    responseTel.close();
                 } catch (IOException | URISyntaxException e) {
                     log.info("Could not initialize AI-SO client, with provided URL");
                     log.info(e.toString());

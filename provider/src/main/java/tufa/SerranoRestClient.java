@@ -129,7 +129,7 @@ public class SerranoRestClient {
         return ResponseUtil.toString(response);
     }
 
-    public String postJSon(String path, String jSon) throws IOException {
+    public CloseableHttpResponse postJSon(String path, String jSon) throws IOException {
         log.debug("Send post json request to [" + path + "], jSon [" + jSon + "]");
         HttpPost httpPost = new HttpPost(applicationUrl + path);
         if (jSon != null) {
@@ -138,10 +138,10 @@ public class SerranoRestClient {
             httpPost.setEntity(jsonInput);
         }
         CloseableHttpResponse response = httpClient.execute(httpPost);
-        return ResponseUtil.toString(response);
+        return response;
     }
 
-    public String post(String path) throws IOException {
+    public CloseableHttpResponse post(String path) throws IOException {
         return postJSon(path, null);
     }
 

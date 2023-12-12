@@ -397,7 +397,7 @@ public class SerranoMappingService {
                     if(keyKey.endsWith("Volume"))
                         keyValue = "</= " + keyValue;
                     if(serranoKey.equals("Application_Performance_Response_Latency") || serranoKey.equals("Application_Performance_Total_Execution_Time") ){
-                        keyValue = "</= " + keyValue + " sec";
+                        keyValue = "</= " + keyValue + " ms";
                     }
 
 

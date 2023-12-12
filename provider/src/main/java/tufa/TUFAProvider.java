@@ -1,15 +1,14 @@
 package tufa;
 
-import alien4cloud.application.ApplicationService;
 import alien4cloud.dao.IGenericSearchDAO;
 import alien4cloud.model.orchestrators.locations.Location;
-import alien4cloud.orchestrators.locations.services.LocationService;
 import alien4cloud.paas.IConfigurablePaaSProvider;
 import alien4cloud.paas.IPaaSCallback;
 import alien4cloud.paas.exception.MaintenanceModeException;
 import alien4cloud.paas.exception.OperationExecutionException;
 import alien4cloud.paas.model.*;
-import alien4cloud.rest.utils.RestClient;
+import alien4cloud.rest.utils.ResponseUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Optional;
 import com.google.common.collect.Maps;
 import com.google.gson.JsonArray;
@@ -22,6 +21,10 @@ import io.fabric8.kubernetes.api.model.storage.StorageClassBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.utils.Serialization;
 import lombok.SneakyThrows;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.BeanFactory;
@@ -30,10 +33,9 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import tufa.model.slurm.SLURMWorkflow;
 import tufa.model.soe.SerranoApp;
 
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.collect.Maps.newHashMap;
@@ -45,6 +47,8 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
 
     protected KubernetesClient kubeClient;
     protected SerranoRestClient aisoClient;
+    protected SerranoRestClient roClient;
+    protected SerranoRestClient telemetryClient;
 
 
 
@@ -119,7 +123,7 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
         serranoDeployments.put(deploymentContext.getDeploymentId(), serranoApp);
         boolean deployed = false;
         try {
-            if (location.getInfrastructureType().equals("SERRANO")) {
+            if (location.getInfrastructureType().equals(TUFAOrchestrator.SERRANO_LOCATION)) {
                 deployed = startSerranoApp(deploymentContext, serranoApp);
             } else {
                 deployed = startKubeApp(deploymentContext, serranoApp);
@@ -207,11 +211,36 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
         String kubeYaml = sb.toString();
         intent.addProperty("deployment_descriptor_yaml", kubeYaml);
 
-        log.info("Generated Kube YAML" + kubeYaml);
+        log.info("Generated Kube YAML:\n" + kubeYaml);
 
-        log.info(intent.toString());
+        log.info("Generated intent JSON:\n" + intent.toString());
+        List<NameValuePair> headers = new ArrayList<>();
+        headers.add(new BasicHeader("Content-Type", "application/json"));
 
-        return true;
+
+        try (CloseableHttpResponse response = aisoClient.postJSon("/ApplicationDeploymentThroughRO", intent.toString())) {
+                if (response.getStatusLine().getStatusCode() == 200) {
+                    //                String string = ResponseUtil.toString(response);
+                    log.info("Got OK result from AI-SO");
+                    String string = EntityUtils.toString(response.getEntity());
+                    log.info(string);
+                    ObjectMapper mapper = new ObjectMapper();
+                    Map<String, Object> dep = mapper.readValue(string, Map.class);
+                    String uuid = (String) dep.get("deployment_uuid");
+                    serranoApp.setSerranoUUID(uuid);
+                    return true;
+                }else{
+                    log.info("Got %d result from AI-SO: %s".formatted(response.getStatusLine().getStatusCode(),
+                            EntityUtils.toString(response.getEntity())));
+                }
+
+        } catch (IOException e) {
+            log.info("Error occurred during application deployment using AI-SO");
+            log.info(e.toString());
+        }
+
+
+        return false;
     }
 
     private boolean startKubeApp(PaaSTopologyDeploymentContext paaSTopologyDeploymentContext, SerranoApp serranoApp) {
@@ -373,60 +402,87 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
         SerranoApp serranoApp = serranoDeployments.get(deploymentContext.getDeploymentId());
 
         if(serranoApp != null) {
-            for (Deployment deployment : serranoApp.getDeployments()) {
-                String nodeName = deployment.getMetadata().getName();
-                nodeName = nodeName.substring(0, nodeName.indexOf('-'));
 
-                if (serranoApp.getVolumeClaims().get(nodeName) != null) {
-                    List<PersistentVolumeClaim> pvcs = serranoApp.getVolumeClaims().get(nodeName);
-                    List<PersistentVolume> persistentVolumes = serranoApp.getVolumes().get(nodeName);
-                    for (int i = 0; i < pvcs.size(); i++) {
-                        PersistentVolumeClaim claim = pvcs.get(i);
+            String location = Arrays.stream(deploymentContext.getDeployment().getLocationIds()).findFirst().orElse(null);
+            if (location == null) {
+                callback.onFailure(new Exception("Cannot retrieve location"));
+                return;
+            }
+            if(location.equals(TUFAOrchestrator.KUBE_LOCATION)) {
 
-                        PersistentVolumeClaim existingPVC = kubeClient.persistentVolumeClaims().withName(claim.getMetadata().getName()).get();
+                for (Deployment deployment : serranoApp.getDeployments()) {
+                    String nodeName = deployment.getMetadata().getName();
+                    nodeName = nodeName.substring(0, nodeName.indexOf('-'));
 
-                        if (existingPVC != null) {
-                            kubeClient.persistentVolumeClaims().resource(existingPVC).delete();
-                            log.info("Persistent Volume Claim '" + existingPVC.getMetadata().getName() + "' deleted.");
-                        }
-                        PersistentVolume pv = persistentVolumes.get(i);
+                    if (serranoApp.getVolumeClaims().get(nodeName) != null) {
+                        List<PersistentVolumeClaim> pvcs = serranoApp.getVolumeClaims().get(nodeName);
+                        List<PersistentVolume> persistentVolumes = serranoApp.getVolumes().get(nodeName);
+                        for (int i = 0; i < pvcs.size(); i++) {
+                            PersistentVolumeClaim claim = pvcs.get(i);
 
-                        try {
-                            PersistentVolume existingPV = kubeClient.persistentVolumes().withName(pv.getMetadata().getName()).get();
-                            if (existingPV != null) {
-                                kubeClient.persistentVolumes().resource(existingPV).delete();
-                                log.info("Perxistent Volume '" + existingPV.getMetadata().getName() + "' deleted.");
+                            PersistentVolumeClaim existingPVC = kubeClient.persistentVolumeClaims().withName(claim.getMetadata().getName()).get();
+
+                            if (existingPVC != null) {
+                                kubeClient.persistentVolumeClaims().resource(existingPVC).delete();
+                                log.info("Persistent Volume Claim '" + existingPVC.getMetadata().getName() + "' deleted.");
                             }
-                        }catch (Exception e){
-                            log.info("Cannot check if a PV has been created due to permission error.");
+                            PersistentVolume pv = persistentVolumes.get(i);
+
+                            try {
+                                PersistentVolume existingPV = kubeClient.persistentVolumes().withName(pv.getMetadata().getName()).get();
+                                if (existingPV != null) {
+                                    kubeClient.persistentVolumes().resource(existingPV).delete();
+                                    log.info("Perxistent Volume '" + existingPV.getMetadata().getName() + "' deleted.");
+                                }
+                            } catch (Exception e) {
+                                log.info("Cannot check if a PV has been created due to permission error.");
+                            }
                         }
                     }
-                }
 
-                ConfigMap configMap = serranoApp.getConfigMaps().get(nodeName);
-                ConfigMap existingCM = kubeClient.configMaps().withName(configMap.getMetadata().getName()).get();
-                if (existingCM != null) {
-                    kubeClient.configMaps().resource(existingCM).delete();
-                    log.info("Config Map '" + configMap.getMetadata().getName() + "' deleted");
-                }
+                    ConfigMap configMap = serranoApp.getConfigMaps().get(nodeName);
+                    ConfigMap existingCM = kubeClient.configMaps().withName(configMap.getMetadata().getName()).get();
+                    if (existingCM != null) {
+                        kubeClient.configMaps().resource(existingCM).delete();
+                        log.info("Config Map '" + configMap.getMetadata().getName() + "' deleted");
+                    }
 
 
-                Deployment existingDeployment = kubeClient.apps().deployments().withName(deployment.getMetadata().getName()).get();
-                if (existingDeployment != null) {
-                    kubeClient.apps().deployments().resource(existingDeployment).delete();
-                    log.info("Deployment '" + deployment.getMetadata().getName() + "' deleted ");
-                }
+                    Deployment existingDeployment = kubeClient.apps().deployments().withName(deployment.getMetadata().getName()).get();
+                    if (existingDeployment != null) {
+                        kubeClient.apps().deployments().resource(existingDeployment).delete();
+                        log.info("Deployment '" + deployment.getMetadata().getName() + "' deleted ");
+                    }
 
-                if (serranoApp.getServices().get(nodeName) != null)
-                    for (Map.Entry<String, Service> entry : serranoApp.getServices().get(nodeName).entrySet()) {
-                        Service service = entry.getValue();
+                    if (serranoApp.getServices().get(nodeName) != null) {
+                        for (Map.Entry<String, Service> entry : serranoApp.getServices().get(nodeName).entrySet()) {
+                            Service service = entry.getValue();
 
-                        Service existingService = kubeClient.services().withName(service.getMetadata().getName()).get();
-                        if (existingService != null) {
-                            kubeClient.services().resource(existingService).delete();
-                            log.info("Service '" + service.getMetadata().getName() + "' deleted.");
+                            Service existingService = kubeClient.services().withName(service.getMetadata().getName()).get();
+                            if (existingService != null) {
+                                kubeClient.services().resource(existingService).delete();
+                                log.info("Service '" + service.getMetadata().getName() + "' deleted.");
+                            }
                         }
                     }
+
+                }
+            }else if (location.equals(TUFAOrchestrator.SERRANO_LOCATION)){
+                //TODO Check what to do in order to undeploy an app deployed through AI-SO
+                List<NameValuePair> headers = new ArrayList<>();
+                headers.add(new BasicHeader("Content-Type", "application/json"));
+
+                JsonObject info = new JsonObject();
+                info.addProperty("appid", serranoApp.getSerranoUUID());
+                info.addProperty("action", "UNDEPLOY");
+
+                try (CloseableHttpResponse response = aisoClient.postJSon("/ApplicationManagement", info.toString())) {
+                    if (response.getStatusLine().getStatusCode() == 200) {
+                        log.info("Successfully undeployed components using AI-SO");
+                    }
+                }catch (IOException e){
+                    log.info("Problem undeploying through AI-SO");
+                }
             }
         }
 
@@ -483,12 +539,12 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
 
             Map<String, Map<String, InstanceInformation>> topology = Maps.newHashMap();
 
-            final List<PaaSNodeTemplate> tasks = deploymentContext.getPaaSTopology().getNonNatives();
+            final List<PaaSNodeTemplate> nodes = deploymentContext.getPaaSTopology().getNonNatives();
 
 
 
 
-            for (PaaSNodeTemplate node : tasks) {
+            for (PaaSNodeTemplate node : nodes) {
                 Map<String, InstanceInformation> instancesInfo = new HashMap<>();
                 // We lookup Entities based on tosca.id (getDeploymentId())
 //            String appId = deploymentContext.getDeployment().getOrchestratorDeploymentId();
@@ -538,7 +594,12 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
 
 //        Map<String, String> slurmInfo = slurmClient.getInfo(configuration, SLURM_JOB_IDS.get(id), info.getAttributes().get("SLURM_ID"));
 
-        Map<String, String> instanceInfo = getKubeInfo(id, node);
+        Map<String, String> instanceInfo = null;
+        if(location.getInfrastructureType().equals(TUFAOrchestrator.KUBE_LOCATION)) {
+            instanceInfo = getKubeInfo(id, node);
+        }else if(location.getInfrastructureType().equals(TUFAOrchestrator.SERRANO_LOCATION)){
+            instanceInfo = getSerranoInfo(id, node);
+        }
 
 
 
@@ -625,9 +686,45 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
         return result;
     }
 
-    private Map<String, String> getSerranoInfo(String id, PaaSNodeTemplate node) {
+    private Map<String, String> getSerranoInfo(SerranoApp app, PaaSNodeTemplate node) {
         Map<String, String> result = new HashMap<>();
-        result.put("status", InstanceStatus.SUCCESS.name());
+        result.put("status", InstanceStatus.FAILURE.name());
+
+        String nodeName = node.getTemplate().getName().toLowerCase();
+        String deploymentName = nodeName + "-" + app.getId();
+        String deploymentUUID = app.getSerranoUUID();
+        List<NameValuePair> headers = new ArrayList<>();
+        headers.add(new BasicHeader("Content-Type", "application/json"));
+        try {
+            CloseableHttpResponse response = roClient.getUrlEncoded("/orchestrator/deployments/logs/" + deploymentUUID, headers);
+            if(response.getStatusLine().getStatusCode() == 200){
+                ObjectMapper mapper = new ObjectMapper();
+                Map<String, Object> map = mapper.readValue(EntityUtils.toString(response.getEntity()), Map.class);
+                Map<String, Object> deployments = (Map<String, Object>) map.get("deployments");
+
+                int status = (int) deployments.get("status");
+                if(status < 2)
+                    result.put("status", InstanceStatus.FAILURE.name());
+                else if(status < 6)
+                    result.put("status", InstanceStatus.PROCESSING.name());
+                else
+                    result.put("status", InstanceStatus.SUCCESS.name());
+
+                List logs = (List) deployments.get("logs");
+                StringBuilder sb = new StringBuilder();
+                for(Object o : logs){
+                    sb.append(o.toString());
+                    sb.append("\n");
+                }
+                result.put("logs", sb.toString());
+            }
+            response.close();
+        } catch (IOException e) {
+            log.info("Error occured when contacting the Resource Orchestrator");
+        } catch (URISyntaxException e) {
+            log.info(e.toString());
+        }
+
         return result;
     }
 
