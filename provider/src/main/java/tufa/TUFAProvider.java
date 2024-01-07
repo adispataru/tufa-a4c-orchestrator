@@ -688,11 +688,14 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
 
     private Map<String, String> getSerranoInfo(SerranoApp app, PaaSNodeTemplate node) {
         Map<String, String> result = new HashMap<>();
-        result.put("status", InstanceStatus.FAILURE.name());
+        result.put("status", InstanceStatus.PROCESSING.name());
 
         String nodeName = node.getTemplate().getName().toLowerCase();
         String deploymentName = nodeName + "-" + app.getId();
         String deploymentUUID = app.getSerranoUUID();
+        if(deploymentUUID == null){
+            return result;
+        }
         List<NameValuePair> headers = new ArrayList<>();
         headers.add(new BasicHeader("Content-Type", "application/json"));
         try {
@@ -716,7 +719,7 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
                     sb.append(o.toString());
                     sb.append("\n");
                 }
-                result.put("logs", sb.toString());
+                result.put("events", sb.toString());
             }
             response.close();
         } catch (IOException e) {
