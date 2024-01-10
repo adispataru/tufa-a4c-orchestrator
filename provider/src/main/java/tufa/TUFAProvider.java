@@ -42,6 +42,7 @@ import static com.google.common.collect.Maps.newHashMap;
 
 public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configuration> {
     private static final Logger log = LoggerFactory.getLogger(TUFAProvider.class);
+    private static final Map<String, String> LOCATION_TYPES = new HashMap<>();
 
     protected Configuration configuration;
 
@@ -104,6 +105,8 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
             callback.onFailure(new Exception("Cannot retrieve location"));
             return;
         }
+
+        LOCATION_TYPES.put(location.getId(), location.getInfrastructureType());
 
 
 
@@ -323,6 +326,20 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
                     if (existingPVC != null) {
                         if(!existingPVC.equals(claim)) {
                             kubeClient.persistentVolumeClaims().resource(existingPVC).delete();
+                            boolean deleted = false;
+                            while(!deleted) {
+                                List<PersistentVolumeClaim> items = kubeClient.persistentVolumeClaims().list().getItems();
+                                if(items.stream().noneMatch(pvc -> pvc.getMetadata().getName().equals(claim.getMetadata().getName()))){
+                                    deleted = true;
+                                }else{
+                                    try {
+                                        Thread.sleep(3000);
+                                    } catch (InterruptedException e) {
+                                        log.info("Error while sleeping");
+                                    }
+                                }
+
+                            }
                             kubeClient.persistentVolumeClaims().resource(claim).create();
                             log.info("Persistent Volume Claim '" + claim.getMetadata().getName() + "' deleted and recreated.");
                         }
@@ -408,7 +425,7 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
                 callback.onFailure(new Exception("Cannot retrieve location"));
                 return;
             }
-            if(location.equals(TUFAOrchestrator.KUBE_LOCATION)) {
+            if(LOCATION_TYPES.get(location).equals(TUFAOrchestrator.KUBE_LOCATION)) {
 
                 for (Deployment deployment : serranoApp.getDeployments()) {
                     String nodeName = deployment.getMetadata().getName();
@@ -467,8 +484,8 @@ public abstract class TUFAProvider implements IConfigurablePaaSProvider<Configur
                     }
 
                 }
-            }else if (location.equals(TUFAOrchestrator.SERRANO_LOCATION)){
-                //TODO Check what to do in order to undeploy an app deployed through AI-SO
+            }else if (LOCATION_TYPES.get(location).equals(TUFAOrchestrator.SERRANO_LOCATION)){
+
                 List<NameValuePair> headers = new ArrayList<>();
                 headers.add(new BasicHeader("Content-Type", "application/json"));
 
